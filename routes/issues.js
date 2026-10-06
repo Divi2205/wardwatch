@@ -23,15 +23,22 @@ const { OPEN_STATUSES, STATUSES } = require('../lib/workflow');
 const router = express.Router();
 const DUPLICATE_RADIUS_M = 150;
 
-// ---------- Photo upload (stored on disk, path saved in MySQL) ----------
+// ---------- Photo upload ----------
+// Locally: saved to /uploads on disk. On Vercel: saved to Vercel Blob
+// storage (BLOB_READ_WRITE_TOKEN is set automatically when a Blob store is
+// connected). Either way, only the photo's URL is stored in MySQL.
+const EXT = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp' };
+const useBlob = !!process.env.BLOB_READ_WRITE_TOKEN;
+const onServerless = !!process.env.VERCEL;
+const newFileName = (mimetype) => `${Date.now()}-${crypto.randomBytes(4).toString('hex')}${EXT[mimetype]}`;
+
 const upload = multer({
-  storage: multer.diskStorage({
-    destination: path.join(__dirname, '..', 'uploads'),
-    filename: (req, file, cb) => {
-      const ext = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp' }[file.mimetype];
-      cb(null, `${Date.now()}-${crypto.randomBytes(4).toString('hex')}${ext}`);
-    }
-  }),
+  storage: useBlob || onServerless
+    ? multer.memoryStorage()
+    : multer.diskStorage({
+        destination: path.join(__dirname, '..', 'uploads'),
+        filename: (req, file, cb) => cb(null, newFileName(file.mimetype))
+      }),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) return cb(null, true);
@@ -154,7 +161,7 @@ router.get('/:id', wrap(async (req, res) => {
 }));
 
 router.post('/', requireLogin, upload.single('photo'), wrap(async (req, res) => {
-  const cleanup = () => req.file && fs.unlink(req.file.path, () => {});
+  const cleanup = () => req.file?.path && fs.unlink(req.file.path, () => {});
   const title = (req.body.title || '').trim();
   const description = (req.body.description || '').trim();
   const category = req.body.category;
@@ -173,7 +180,20 @@ router.post('/', requireLogin, upload.single('photo'), wrap(async (req, res) => 
   if (!cats.length) return fail('Choose a category.');
 
   const triage = scoreIssue({ baseWeight: cats[0].base_weight, title, description });
-  const photoPath = req.file ? `/uploads/${req.file.filename}` : null;
+
+  let photoPath = null;
+  if (req.file && useBlob) {
+    const { put } = require('@vercel/blob');
+    const blob = await put(`issues/${newFileName(req.file.mimetype)}`, req.file.buffer, {
+      access: 'public',
+      contentType: req.file.mimetype
+    });
+    photoPath = blob.url;
+  } else if (req.file && onServerless) {
+    return fail('Photo uploads aren\'t set up on this server yet. Submit without a photo for now.');
+  } else if (req.file) {
+    photoPath = `/uploads/${req.file.filename}`;
+  }
 
   const conn = await pool.getConnection();
   try {

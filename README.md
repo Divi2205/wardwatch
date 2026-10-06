@@ -17,8 +17,8 @@ Browsers can't connect to MySQL directly, so `server.js` and the files in `route
 | | Fontsource (Barlow) | Fonts bundled with the app, so no Google Fonts call |
 | Server | Express | Routes, JSON, serving the React build |
 | | mysql2 | The MySQL connection |
-| | express-session, bcryptjs | Logins and password hashing |
-| | multer | Photo uploads |
+| | cookie-session, bcryptjs | Logins (signed cookie) and password hashing |
+| | multer, @vercel/blob | Photo uploads (disk locally, Vercel Blob when deployed) |
 | | dotenv | Reads settings from `.env` |
 | Dev only | concurrently | Runs the server and React together with one command |
 
@@ -34,11 +34,11 @@ You need **Node.js 18+** and **MySQL 8** (or MariaDB 10.5+) installed.
    ```
    npm install
    ```
-2. **Create the database.** This creates the `wardwatch` database and all tables. It deletes any existing `wardwatch` database.
+2. **Configure.** Copy `.env.example` to `.env` and put in your MySQL password.
+3. **Create the database.** This creates the `wardwatch` database and all tables. It deletes any existing `wardwatch` database.
    ```
-   mysql -u root -p < db/schema.sql
+   npm run db:init
    ```
-3. **Configure.** Copy `.env.example` to `.env` and put in your MySQL password.
 4. **Load demo data** (accounts plus 28 realistic issues at different stages):
    ```
    npm run seed
@@ -58,6 +58,20 @@ You need **Node.js 18+** and **MySQL 8** (or MariaDB 10.5+) installed.
 Four more citizens (fathima, karthik, meena, rahul @example.com) use the same password. New sign-ups are always citizens; admins only come from the seed script.
 
 ---
+
+## Deploying to Vercel (public link, always on)
+
+Vercel serves the React build from its CDN and runs the Express API as a serverless function (`api/index.js`). It doesn't host MySQL, so the database lives on a free cloud MySQL service. **TiDB Cloud Starter** is recommended: it's MySQL-compatible, free, and doesn't go to sleep.
+
+1. **Create the cloud database.** Sign up at tidbcloud.com, create a *Starter* cluster (pick the Mumbai or Singapore region), and open **Connect**. Note the host, port, user and password.
+2. **Load the tables and demo data from your laptop.** Put those values in your `.env` with `DB_SSL=true` and `DB_NAME=wardwatch`. Set `SEED_OFFICER_PASSWORD` to a private password so the officer login isn't the one in this README. Then run `npm run db:init`, then `npm run seed`.
+3. **Push this project to GitHub.**
+4. **Create the Vercel project** from that GitHub repo (vercel.com → Add New → Project → import the repo). Vercel picks up `vercel.json` automatically.
+5. **Add environment variables** in Vercel → Project → Settings → Environment Variables: `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, and `DB_SSL=true`. Optionally add `SESSION_SECRET` and `CRON_SECRET` (any long random strings).
+6. **Turn on photo uploads:** Vercel → Storage → Create → Blob → connect it to the project. This adds `BLOB_READ_WRITE_TOKEN` automatically. Without it, reports still work but photos are refused.
+7. **Redeploy** (Deployments → ⋯ → Redeploy), then open `https://<your-project>.vercel.app/api/health`. It should say `"database": "connected"`.
+
+Every push to GitHub redeploys automatically. Escalations run whenever someone uses the site (at most every 10 minutes) and once a day via Vercel Cron.
 
 ## How the requirements are met
 
@@ -121,10 +135,14 @@ submitted ──► acknowledged ──► in_progress ──► resolved ──
 
 ```
 wardwatch/
-├── server.js              Express app: /api routes, serves the React build, runs escalation
+├── app.js                 Express app: sessions, /api routes, error handling
+├── server.js              Local server: runs app.js, serves the React build, escalation timer
+├── api/index.js           Vercel entry point (runs app.js as a serverless function)
+├── vercel.json            Vercel build, routing and daily cron settings
 ├── db.js                  MySQL connection pool
 ├── db/
 │   ├── schema.sql         Tables and categories
+│   ├── init.js            npm run db:init (runs schema.sql, no mysql client needed)
 │   └── seed.js            Demo accounts and issues
 ├── lib/                   auth guards, triage scoring, status rules, async helper
 ├── routes/                auth, issues, admin, stats (all the SQL lives here)

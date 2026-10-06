@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------
 // /api/auth : register, log in, log out, who am I
-// Passwords are hashed with bcrypt; the logged-in user lives in the session.
+// Passwords are hashed with bcrypt; the logged-in user lives in a signed session cookie.
 // ---------------------------------------------------------------------
 const express = require('express');
 const bcrypt = require('bcryptjs');
@@ -52,7 +52,8 @@ router.post('/login', wrap(async (req, res) => {
 }));
 
 router.post('/logout', (req, res) => {
-  req.session.destroy(() => res.json({ ok: true }));
+  req.session = null; // clears the session cookie
+  res.json({ ok: true });
 });
 
 router.get('/me', (req, res) => {

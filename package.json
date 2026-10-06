@@ -8,16 +8,18 @@
     "build": "npm run build --prefix client",
     "start": "node server.js",
     "dev": "concurrently -n api,react -c yellow,cyan \"node --watch server.js\" \"npm run dev --prefix client\"",
+    "db:init": "node db/init.js",
     "seed": "node db/seed.js"
   },
   "engines": {
     "node": ">=18"
   },
   "dependencies": {
+    "@vercel/blob": "^2.8.1",
     "bcryptjs": "^2.4.3",
+    "cookie-session": "^2.1.1",
     "dotenv": "^16.4.5",
     "express": "^4.21.2",
-    "express-session": "^1.18.1",
     "multer": "^2.0.2",
     "mysql2": "^3.11.5"
   },

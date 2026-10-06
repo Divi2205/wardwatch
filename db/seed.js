@@ -12,7 +12,8 @@ const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
 
 const USERS = [
-  { name: 'Kavitha Subramanian', email: 'officer@wardwatch.local', password: 'Officer@123', role: 'admin' },
+  // For a public deployment, set SEED_OFFICER_PASSWORD so the officer login isn't the one in the README
+  { name: 'Kavitha Subramanian', email: 'officer@wardwatch.local', password: process.env.SEED_OFFICER_PASSWORD || 'Officer@123', role: 'admin' },
   { name: 'Priya Raman', email: 'priya@example.com', password: 'Citizen@123', role: 'citizen' },
   { name: 'Arjun Mehta', email: 'arjun@example.com', password: 'Citizen@123', role: 'citizen' },
   { name: 'Fathima Begum', email: 'fathima@example.com', password: 'Citizen@123', role: 'citizen' },
@@ -166,7 +167,10 @@ async function seed() {
     console.log(`Escalated ${m.escalated} overdue issues.`);
 
     console.log('\nDone. Demo accounts:');
-    for (const u of USERS) console.log(`  ${u.role.padEnd(8)} ${u.email}  /  ${u.password}`);
+    for (const u of USERS) {
+      const shown = u.role === 'admin' && process.env.SEED_OFFICER_PASSWORD ? '(your SEED_OFFICER_PASSWORD)' : u.password;
+      console.log(`  ${u.role.padEnd(8)} ${u.email}  /  ${shown}`);
+    }
   } finally {
     conn.release();
     await pool.end();
