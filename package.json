@@ -1,0 +1,27 @@
+{
+  "name": "wardwatch",
+  "version": "1.0.0",
+  "description": "Neighbourhood issue reporter: residents report civic problems, ward officers triage and resolve them, everyone sees the dashboard. React + Express + MySQL.",
+  "main": "server.js",
+  "scripts": {
+    "postinstall": "npm install --prefix client",
+    "build": "npm run build --prefix client",
+    "start": "node server.js",
+    "dev": "concurrently -n api,react -c yellow,cyan \"node --watch server.js\" \"npm run dev --prefix client\"",
+    "seed": "node db/seed.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "express-session": "^1.18.1",
+    "multer": "^2.0.2",
+    "mysql2": "^3.11.5"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
